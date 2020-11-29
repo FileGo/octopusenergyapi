@@ -61,10 +61,18 @@ var PCs = map[int]string{
 	8: "Non-domestic, with MD recording capability and with LF greater than 40% (also all non-half-hourly export MSIDs)",
 }
 
+var postcodeRegex *regexp.Regexp
+
+func init() {
+	// Compile postcode regexp
+	postcodeRegex = regexp.MustCompile(`^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9]?[A-Za-z])))) [0-9][A-Za-z]{2})$`)
+}
+
 // Client represents a Client to be used with the API
 type Client struct {
-	httpClient *http.Client
-	URL        string
+	httpClient    *http.Client
+	URL           string
+	postcodeRegex *regexp.Regexp
 }
 
 // NewClient returns a client
@@ -72,13 +80,13 @@ func NewClient(APIkey string, httpClient *http.Client) (*Client, error) {
 	// Empty APIkey is not permitted
 	APIkey = strings.TrimSpace(APIkey)
 	if len(APIkey) == 0 {
-		return &Client{}, errors.New("API key should not be empty")
+		return nil, errors.New("API key should not be empty")
 	}
 
 	// Add APIkey as username to base URL
 	baseURL, err := urlAddUsername(baseURL, APIkey)
 	if err != nil {
-		return &Client{}, fmt.Errorf("unable to add username to url: %w", err)
+		return nil, errors.Errorf("unable to add username to url: %v", err)
 	}
 
 	return &Client{
@@ -106,17 +114,17 @@ func (c *Client) GetMeterPoint(mpan string) (MeterPoint, error) {
 
 	resp, err := c.httpClient.Get(fmt.Sprintf("%s/electricity-meter-points/%s/", c.URL, mpan))
 	if err != nil {
-		return MeterPoint{}, fmt.Errorf("http get error: %w", err)
+		return MeterPoint{}, errors.Errorf("http get error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return MeterPoint{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
+		return MeterPoint{}, errors.Errorf("http error - code %d received", resp.StatusCode)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
-		return MeterPoint{}, fmt.Errorf("unable to unmarshal json: %w", err)
+		return MeterPoint{}, errors.Errorf("unable to unmarshal json: %v", err)
 	}
 
 	// Mask JSON struct into MeterPoint
@@ -137,10 +145,10 @@ func (c *Client) GetMeterPoint(mpan string) (MeterPoint, error) {
 
 // GetGridSupplyPoint gets a grid supply point based on postcode
 // https://developer.octopus.energy/docs/api/#list-grid-supply-points
-func (c Client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
+func (c *Client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
 	// Check if postcode is valid
 	if !checkPostcode(postcode) {
-		return GridSupplyPoint{}, fmt.Errorf("invalid postcode %s", postcode)
+		return GridSupplyPoint{}, errors.Errorf("invalid postcode %s", postcode)
 	}
 
 	// Remove spaces from postcode
@@ -158,17 +166,17 @@ func (c Client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
 
 	resp, err := c.httpClient.Get(fmt.Sprintf("%s/industry/grid-supply-points/?postcode=%s", c.URL, postcode))
 	if err != nil {
-		return GridSupplyPoint{}, fmt.Errorf("http get error: %w", err)
+		return GridSupplyPoint{}, errors.Errorf("http get error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return GridSupplyPoint{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
+		return GridSupplyPoint{}, errors.Errorf("http error - code %d received", resp.StatusCode)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
-		return GridSupplyPoint{}, fmt.Errorf("unable to unmarshal json: %w", err)
+		return GridSupplyPoint{}, errors.Errorf("unable to unmarshal json: %v", err)
 	}
 
 	// Only return data if we are dealing with a single result
@@ -221,7 +229,7 @@ func (c *Client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 
 	apiURL, err := url.Parse(fmt.Sprintf("%s/electricity-meter-points/%s/meters/%s/consumption/", c.URL, mpan, serialNo))
 	if err != nil {
-		return []Consumption{}, fmt.Errorf("unable to parse request url: %w", err)
+		return nil, errors.Errorf("unable to parse request url: %v", err)
 	}
 
 	// Add options to URL if they are provided
@@ -247,17 +255,17 @@ func (c *Client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 
 	resp, err := c.httpClient.Get(apiURL.String())
 	if err != nil {
-		return []Consumption{}, fmt.Errorf("http get error: %w", err)
+		return nil, errors.Errorf("http get error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return []Consumption{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
+		return nil, errors.Errorf("http error - code %d received", resp.StatusCode)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
-		return []Consumption{}, fmt.Errorf("unable to unmarshal json: %w", err)
+		return nil, errors.Errorf("unable to unmarshal json: %v", err)
 	}
 
 	return data.Results, nil
@@ -266,8 +274,7 @@ func (c *Client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 
 // checkPostcode checks if provided string is a valid UK postcode
 func checkPostcode(postcode string) bool {
-	match, _ := regexp.MatchString(`^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9]?[A-Za-z])))) [0-9][A-Za-z]{2})$`, postcode)
-	return match
+	return postcodeRegex.MatchString(postcode)
 }
 
 // Product represents an Octopus Energy product
@@ -329,17 +336,17 @@ func (c *Client) listProductsPage(URL string) ([]Product, string, error) {
 
 	resp, err := c.httpClient.Get(URL)
 	if err != nil {
-		return []Product{}, "", fmt.Errorf("http get error: %w", err)
+		return nil, "", errors.Errorf("http get error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return []Product{}, "", fmt.Errorf("http error - code %d received", resp.StatusCode)
+		return nil, "", errors.Errorf("http error - code %d received", resp.StatusCode)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
-		return []Product{}, "", fmt.Errorf("unable to unmarshal json: %w", err)
+		return nil, "", errors.Errorf("unable to unmarshal json: %v", err)
 	}
 
 	return data.Results, data.Next, nil
@@ -356,7 +363,7 @@ func (c *Client) ListProducts() ([]Product, error) {
 		pageProducts, url, err := c.listProductsPage(URL)
 		URL = url
 		if err != nil {
-			return []Product{}, fmt.Errorf("error retrieving products page: %w", err)
+			return nil, errors.Errorf("error retrieving products page: %v", err)
 		}
 
 		for _, product := range pageProducts {
@@ -378,17 +385,17 @@ func (c *Client) GetProduct(productCode string) (Product, error) {
 
 	resp, err := c.httpClient.Get(fmt.Sprintf("%s/products/%s/", c.URL, productCode))
 	if err != nil {
-		return Product{}, fmt.Errorf("http get error: %w", err)
+		return Product{}, errors.Errorf("http get error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return Product{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
+		return Product{}, errors.Errorf("http error - code %d received", resp.StatusCode)
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&product)
 	if err != nil {
-		return Product{}, fmt.Errorf("unable to unmarshal json: %w", err)
+		return Product{}, errors.Errorf("unable to unmarshal json: %v", err)
 	}
 
 	return product, nil
@@ -398,7 +405,7 @@ func (c *Client) GetProduct(productCode string) (Product, error) {
 func urlAddUsername(URL, username string) (string, error) {
 	u, err := url.Parse(URL)
 	if err != nil {
-		return "", fmt.Errorf("error parsing url: %w", err)
+		return "", errors.Errorf("error parsing url: %v", err)
 	}
 
 	u.User = url.UserPassword(username, "")
