@@ -8,7 +8,7 @@
 
 This package provides an interface to [Octopus Energy's](https://octopus.energy/) [API](https://developer.octopus.energy/docs/api/), which provides a lot of useful data, including viewing half-hourly consumption of an electricity or gas meter.
 
-An API key from Octopus energy is required, as mentioned [here](https://developer.octopus.energy/docs/api/#authentication). This can be obtained from your online dashboard.
+An API key from Octopus Energy is required, as mentioned [here](https://developer.octopus.energy/docs/api/#authentication). This can be obtained from your online dashboard.
 
 ## Usage
 
@@ -23,8 +23,10 @@ if err != nil {
     log.Fatal(err)
 }
 
-fmt.Printf("MPAN: %s\nProfile class: %d (%s)\n", mpoint.MPAN, mpoint.ProfileClass, octopusenergyapi.PCs[mpoint.ProfileClass])
-fmt.Printf("GSP: %s (%s)\n", mpoint.GSP.GSPGroupID, mpoint.GSP.Name)
+fmt.Printf("MPAN: %s\nProfile class: %d (%s)\n",
+    mpoint.MPAN, mpoint.ProfileClass, octopusenergyapi.PCs[mpoint.ProfileClass])
+fmt.Printf("GSP: %s (%s)\n",
+    mpoint.GSP.GSPGroupID, mpoint.GSP.Name)
 ```
 
 If you find bug or would like to see some additional functionality, please raise an issue. PRs are also more than welcome.

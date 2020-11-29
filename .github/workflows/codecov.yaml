@@ -9,8 +9,15 @@ jobs:
     env:
       OS: ${{ matrix.os }}
     steps:
+      - name: Install go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.version }}
+
       - uses: actions/checkout@v2
+
       - uses: codecov/codecov-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          env_vars: OS
           verbose: true
