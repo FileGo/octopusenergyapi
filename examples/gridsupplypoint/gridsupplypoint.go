@@ -11,7 +11,7 @@ import (
 func main() {
 	postcode := "SW1A 1AA"
 
-	client, err := octopusenergyapi.NewClient("https://api.octopus.energy/v1/", "{API_KEY}", http.DefaultClient)
+	client, err := octopusenergyapi.NewClient("{API_KEY}", http.DefaultClient)
 	if err != nil {
 		log.Fatal(err)
 	}

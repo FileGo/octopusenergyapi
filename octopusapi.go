@@ -13,6 +13,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	iso8601 = "2006-01-02T15:04:05.000+0000"
+	baseURL = "https://api.octopus.energy/v1"
+)
+
 // GridSupplyPoint represents a Grid Supply Point (GSP)
 type GridSupplyPoint struct {
 	ID            int
@@ -56,25 +61,28 @@ var PCs = map[int]string{
 	8: "Non-domestic, with MD recording capability and with LF greater than 40% (also all non-half-hourly export MSIDs)",
 }
 
-// client something
-type client struct {
+// Client represents a Client to be used with the API
+type Client struct {
 	httpClient *http.Client
-	baseURL    string
+	URL        string
 }
 
 // NewClient returns a client
-func NewClient(baseURL string, APIkey string, httpClient *http.Client) (client, error) {
-	// Trim trailing slash(es)
-	baseURL = strings.TrimRight(baseURL, "/")
+func NewClient(APIkey string, httpClient *http.Client) (*Client, error) {
+	// Empty APIkey is not permitted
+	APIkey = strings.TrimSpace(APIkey)
+	if len(APIkey) == 0 {
+		return &Client{}, errors.New("API key should not be empty")
+	}
 
 	// Add APIkey as username to base URL
 	baseURL, err := urlAddUsername(baseURL, APIkey)
 	if err != nil {
-		return client{}, fmt.Errorf("unable to add username to url: %w", err)
+		return &Client{}, fmt.Errorf("unable to add username to url: %w", err)
 	}
 
-	return client{
-		baseURL:    baseURL,
+	return &Client{
+		URL:        baseURL,
 		httpClient: httpClient,
 	}, nil
 }
@@ -87,50 +95,49 @@ type MeterPoint struct {
 	ProfileClass int
 }
 
-const iso8601 = "2006-01-02T15:04:05.000+0000"
-
 // GetMeterPoint retrieves a meter point for a given MPAN
 // https://developer.octopus.energy/docs/api/#electricity-meter-points
-func (c *client) GetMeterPoint(mpan string) (MeterPoint, error) {
+func (c *Client) GetMeterPoint(mpan string) (MeterPoint, error) {
 	data := struct {
 		GspID        string `json:"gsp"`
 		MPAN         string `json:"mpan"`
 		ProfileClass int    `json:"profile_class"`
 	}{}
 
-	resp, err := c.httpClient.Get(fmt.Sprintf("%s/electricity-meter-points/%s/", c.baseURL, mpan))
+	resp, err := c.httpClient.Get(fmt.Sprintf("%s/electricity-meter-points/%s/", c.URL, mpan))
 	if err != nil {
 		return MeterPoint{}, fmt.Errorf("http get error: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		err := json.NewDecoder(resp.Body).Decode(&data)
-		if err != nil {
-			return MeterPoint{}, fmt.Errorf("unable to unmarshal json: %w", err)
-		}
-
-		// Mask JSON struct into MeterPoint
-		mPoint := MeterPoint{
-			MPAN:         data.MPAN,
-			ProfileClass: data.ProfileClass,
-		}
-
-		for _, gsp := range GSPs {
-			if gsp.GSPGroupID == data.GspID {
-				mPoint.GSP = gsp
-				return mPoint, nil
-			}
-		}
-
-		return MeterPoint{}, errors.New("no grid supply point found")
+	if resp.StatusCode != http.StatusOK {
+		return MeterPoint{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
 	}
-	return MeterPoint{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
+
+	err = json.NewDecoder(resp.Body).Decode(&data)
+	if err != nil {
+		return MeterPoint{}, fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	// Mask JSON struct into MeterPoint
+	mPoint := MeterPoint{
+		MPAN:         data.MPAN,
+		ProfileClass: data.ProfileClass,
+	}
+
+	for _, gsp := range GSPs {
+		if gsp.GSPGroupID == data.GspID {
+			mPoint.GSP = gsp
+			return mPoint, nil
+		}
+	}
+
+	return MeterPoint{}, errors.New("no grid supply point found")
 }
 
 // GetGridSupplyPoint gets a grid supply point based on postcode
 // https://developer.octopus.energy/docs/api/#list-grid-supply-points
-func (c client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
+func (c Client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
 	// Check if postcode is valid
 	if !checkPostcode(postcode) {
 		return GridSupplyPoint{}, fmt.Errorf("invalid postcode %s", postcode)
@@ -149,30 +156,33 @@ func (c client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
 		} `json:"results"`
 	}{}
 
-	resp, err := c.httpClient.Get(fmt.Sprintf("%s/industry/grid-supply-points/?postcode=%s", c.baseURL, postcode))
+	resp, err := c.httpClient.Get(fmt.Sprintf("%s/industry/grid-supply-points/?postcode=%s", c.URL, postcode))
 	if err != nil {
 		return GridSupplyPoint{}, fmt.Errorf("http get error: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		err := json.NewDecoder(resp.Body).Decode(&data)
-		if err != nil {
-			return GridSupplyPoint{}, fmt.Errorf("unable to unmarshal json: %w", err)
-		}
+	if resp.StatusCode != http.StatusOK {
+		return GridSupplyPoint{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
+	}
 
-		// Only return data if we are dealing with a single result
-		if len(data.Results) == 1 {
-			for _, gsp := range GSPs {
-				if gsp.GSPGroupID == data.Results[0].GroupID {
-					return gsp, nil
-				}
-			}
-			return GridSupplyPoint{}, errors.New("unknown grid supply point")
-		}
+	err = json.NewDecoder(resp.Body).Decode(&data)
+	if err != nil {
+		return GridSupplyPoint{}, fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	// Only return data if we are dealing with a single result
+	if len(data.Results) != 1 {
 		return GridSupplyPoint{}, errors.New("more than one supply point received")
 	}
-	return GridSupplyPoint{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
+
+	for _, gsp := range GSPs {
+		if gsp.GSPGroupID == data.Results[0].GroupID {
+			return gsp, nil
+		}
+	}
+	return GridSupplyPoint{}, errors.New("unknown grid supply point")
+
 }
 
 // Consumption represents a power consumption in a given interval
@@ -201,7 +211,7 @@ type ConsumptionOption struct {
 
 // GetMeterConsumption retrieves meter consumption
 // https://developer.octopus.energy/docs/api/#consumption
-func (c *client) GetMeterConsumption(mpan, serialNo string, options ConsumptionOption) ([]Consumption, error) {
+func (c *Client) GetMeterConsumption(mpan, serialNo string, options ConsumptionOption) ([]Consumption, error) {
 	data := struct {
 		Count        int           `json:"count"`
 		NextPage     string        `json:"next"`
@@ -209,7 +219,7 @@ func (c *client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 		Results      []Consumption `json:"results"`
 	}{}
 
-	apiURL, err := url.Parse(fmt.Sprintf("%s/electricity-meter-points/%s/meters/%s/consumption/", c.baseURL, mpan, serialNo))
+	apiURL, err := url.Parse(fmt.Sprintf("%s/electricity-meter-points/%s/meters/%s/consumption/", c.URL, mpan, serialNo))
 	if err != nil {
 		return []Consumption{}, fmt.Errorf("unable to parse request url: %w", err)
 	}
@@ -241,15 +251,17 @@ func (c *client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		err := json.NewDecoder(resp.Body).Decode(&data)
-		if err != nil {
-			return []Consumption{}, fmt.Errorf("unable to unmarshal json: %w", err)
-		}
-
-		return data.Results, nil
+	if resp.StatusCode != http.StatusOK {
+		return []Consumption{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
 	}
-	return []Consumption{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
+
+	err = json.NewDecoder(resp.Body).Decode(&data)
+	if err != nil {
+		return []Consumption{}, fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	return data.Results, nil
+
 }
 
 // checkPostcode checks if provided string is a valid UK postcode
@@ -312,7 +324,7 @@ type productJSON struct {
 }
 
 // listProductsPage retrieves products from a single page of JSON data
-func (c *client) listProductsPage(URL string) ([]Product, string, error) {
+func (c *Client) listProductsPage(URL string) ([]Product, string, error) {
 	var data productJSON
 
 	resp, err := c.httpClient.Get(URL)
@@ -321,24 +333,24 @@ func (c *client) listProductsPage(URL string) ([]Product, string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		err := json.NewDecoder(resp.Body).Decode(&data)
-		if err != nil {
-			return []Product{}, "", fmt.Errorf("unable to unmarshal json: %w", err)
-		}
-
-		return data.Results, data.Next, nil
+	if resp.StatusCode != http.StatusOK {
+		return []Product{}, "", fmt.Errorf("http error - code %d received", resp.StatusCode)
 	}
 
-	return []Product{}, "", fmt.Errorf("http error - code %d received", resp.StatusCode)
+	err = json.NewDecoder(resp.Body).Decode(&data)
+	if err != nil {
+		return []Product{}, "", fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	return data.Results, data.Next, nil
 }
 
 // ListProducts returns a list of energy products
 // https://developer.octopus.energy/docs/api/#list-products
-func (c *client) ListProducts() ([]Product, error) {
+func (c *Client) ListProducts() ([]Product, error) {
 	var products []Product
 
-	URL := fmt.Sprintf("%s/products/", c.baseURL)
+	URL := fmt.Sprintf("%s/products/", c.URL)
 
 	for {
 		pageProducts, url, err := c.listProductsPage(URL)
@@ -361,25 +373,25 @@ func (c *client) ListProducts() ([]Product, error) {
 
 // GetProduct retrieves a product based on its name
 // https://developer.octopus.energy/docs/api/#retrieve-a-product
-func (c *client) GetProduct(productCode string) (Product, error) {
+func (c *Client) GetProduct(productCode string) (Product, error) {
 	var product Product
 
-	resp, err := c.httpClient.Get(fmt.Sprintf("%s/products/%s/", c.baseURL, productCode))
+	resp, err := c.httpClient.Get(fmt.Sprintf("%s/products/%s/", c.URL, productCode))
 	if err != nil {
 		return Product{}, fmt.Errorf("http get error: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		err := json.NewDecoder(resp.Body).Decode(&product)
-		if err != nil {
-			return Product{}, fmt.Errorf("unable to unmarshal json: %w", err)
-		}
-
-		return product, nil
+	if resp.StatusCode != http.StatusOK {
+		return Product{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
 	}
 
-	return Product{}, fmt.Errorf("http error - code %d received", resp.StatusCode)
+	err = json.NewDecoder(resp.Body).Decode(&product)
+	if err != nil {
+		return Product{}, fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	return product, nil
 }
 
 // urlAddUsername adds username to URL
