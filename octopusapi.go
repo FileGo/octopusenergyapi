@@ -27,7 +27,7 @@ type GridSupplyPoint struct {
 // https://en.wikipedia.org/wiki/Meter_Point_Administration_Number#Distributor_ID
 var GSPs = [...]GridSupplyPoint{
 	{10, "Eastern England", "UK Power Networks", "0800 029 4285", "EELC", "_A"},
-	{11, "East Midlands", "Western Power Distrubution", "0800 096 3080", "EMEB", "_B"},
+	{11, "East Midlands", "Western Power Distribution", "0800 096 3080", "EMEB", "_B"},
 	{12, "London", "UK Power Networks", "0800 029 4285", "LOND", "_C"},
 	{13, "Merseyside and Northern Wales", "SP Energy Networks", "0330 10 10 444", "MANW", "_D"},
 	{14, "West Midlands", "Western Power Distribution", "0800 096 3080", "MIDE", "_E"},
