@@ -58,12 +58,12 @@ var PCs = map[int]string{
 
 // client something
 type client struct {
-	httpClient http.Client
+	httpClient *http.Client
 	baseURL    string
 }
 
 // NewClient returns a client
-func NewClient(baseURL string, APIkey string, httpClient http.Client) (client, error) {
+func NewClient(baseURL string, APIkey string, httpClient *http.Client) (client, error) {
 	// Trim trailing slash(es)
 	baseURL = strings.TrimRight(baseURL, "/")
 
@@ -168,7 +168,7 @@ func (c client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
 					return gsp, nil
 				}
 			}
-			return GridSupplyPoint{}, errors.New("unkown grid supply point")
+			return GridSupplyPoint{}, errors.New("unknown grid supply point")
 		}
 		return GridSupplyPoint{}, errors.New("more than one supply point received")
 	}
@@ -223,7 +223,7 @@ func (c *client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 		if options.OrderBy != "" {
 			q.Add("order_by", options.OrderBy)
 		}
-		if options.GroupBy == "" {
+		if options.GroupBy != "" {
 			q.Add("group_by", options.GroupBy)
 		}
 		if !options.From.IsZero() {
@@ -313,9 +313,9 @@ type productJSON struct {
 
 // listProductsPage retrieves products from a single page of JSON data
 func (c *client) listProductsPage(URL string) ([]Product, string, error) {
-	data := productJSON{}
+	var data productJSON
 
-	resp, err := http.Get(URL)
+	resp, err := c.httpClient.Get(URL)
 	if err != nil {
 		return []Product{}, "", fmt.Errorf("http get error: %w", err)
 	}
@@ -336,7 +336,7 @@ func (c *client) listProductsPage(URL string) ([]Product, string, error) {
 // ListProducts returns a list of energy products
 // https://developer.octopus.energy/docs/api/#list-products
 func (c *client) ListProducts() ([]Product, error) {
-	products := []Product{}
+	var products []Product
 
 	URL := fmt.Sprintf("%s/products/", c.baseURL)
 

@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	client, err := octopusenergyapi.NewClient("https://api.octopus.energy/v1/", "{API_KEY}", *http.DefaultClient)
+	client, err := octopusenergyapi.NewClient("https://api.octopus.energy/v1/", "{API_KEY}", http.DefaultClient)
 	if err != nil {
 		log.Fatal(err)
 	}
