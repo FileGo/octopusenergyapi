@@ -8,71 +8,15 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 )
-
-const (
-	iso8601 = "2006-01-02T15:04:05.000+0000"
-	baseURL = "https://api.octopus.energy/v1"
-)
-
-// GridSupplyPoint represents a Grid Supply Point (GSP)
-type GridSupplyPoint struct {
-	ID            int
-	Name          string
-	Operator      string
-	PhoneNumber   string
-	ParticipantID string
-	GSPGroupID    string
-}
-
-// GSPs provides a list of Grid Supply Points (GSP)
-// https://en.wikipedia.org/wiki/Meter_Point_Administration_Number#Distributor_ID
-var GSPs = [...]GridSupplyPoint{
-	{10, "Eastern England", "UK Power Networks", "0800 029 4285", "EELC", "_A"},
-	{11, "East Midlands", "Western Power Distribution", "0800 096 3080", "EMEB", "_B"},
-	{12, "London", "UK Power Networks", "0800 029 4285", "LOND", "_C"},
-	{13, "Merseyside and Northern Wales", "SP Energy Networks", "0330 10 10 444", "MANW", "_D"},
-	{14, "West Midlands", "Western Power Distribution", "0800 096 3080", "MIDE", "_E"},
-	{15, "North Eastern England", "Northern Powergrid", "0800 011 3332", "NEEB", "_F"},
-	{16, "North Western England", "Electricity North West", "0800 048 1820", "NORW", "_G"},
-	{17, "Northern Scotland", "Scottish & Southern Electricity Networks", "0800 048 3516", "HYDE", "_P"},
-	{18, "Southern Scotland", "SP Energy Networks", "0330 10 10 444", "SPOW", "_N"},
-	{19, "South Eastern England", "UK Power Networks", "0800 029 4285", "SEEB", "_J"},
-	{20, "Southern England", "Scottish & Southern Electricity Networks", "0800 048 3516", "SOUT", "_H"},
-	{21, "Southern Wales", "Western Power Distribution", "0800 096 3080", "SWAE", "_K"},
-	{22, "South Western England", "Western Power Distribution", "0800 096 3080", "SWEB", "_L"},
-	{23, "Yorkshire", "Northern Powergrid", "0800 011 3332", "YELG", "_M"},
-}
-
-// PCs represents Profile Class of a meter point
-// https://en.wikipedia.org/wiki/Meter_Point_Administration_Number#Profile_Class_(PC)
-var PCs = map[int]string{
-	0: "Half-hourly supply (import and export)",
-	1: "Domestic unrestricted",
-	2: "Domestic Economy meter of two or more rates",
-	3: "Non-domestic unrestricted",
-	4: "Non-domestic Economy 7",
-	5: "Non-domestic, with maximum demand (MD) recording capability and with load factor (LF) less than or equal to 20%",
-	6: "Non-domestic, with MD recording capability and with LF less than or equal to 30% and greater than 20%",
-	7: "Non-domestic, with MD recording capability and with LF less than or equal to 40% and greater than 30%",
-	8: "Non-domestic, with MD recording capability and with LF greater than 40% (also all non-half-hourly export MSIDs)",
-}
 
 var postcodeRegex *regexp.Regexp
 
 func init() {
 	// Compile postcode regexp
 	postcodeRegex = regexp.MustCompile(`^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9]?[A-Za-z])))) [0-9][A-Za-z]{2})$`)
-}
-
-// Client represents a Client to be used with the API
-type Client struct {
-	httpClient    *http.Client
-	URL           string
-	postcodeRegex *regexp.Regexp
 }
 
 // NewClient returns a client
@@ -95,14 +39,6 @@ func NewClient(APIkey string, httpClient *http.Client) (*Client, error) {
 	}, nil
 }
 
-// MeterPoint represents a meter point
-// https://developer.octopus.energy/docs/api/#retrieve-a-meter-point
-type MeterPoint struct {
-	GSP          GridSupplyPoint
-	MPAN         string
-	ProfileClass int
-}
-
 // GetMeterPoint retrieves a meter point for a given MPAN
 // https://developer.octopus.energy/docs/api/#electricity-meter-points
 func (c *Client) GetMeterPoint(mpan string) (MeterPoint, error) {
@@ -112,19 +48,9 @@ func (c *Client) GetMeterPoint(mpan string) (MeterPoint, error) {
 		ProfileClass int    `json:"profile_class"`
 	}{}
 
-	resp, err := c.httpClient.Get(fmt.Sprintf("%s/electricity-meter-points/%s/", c.URL, mpan))
+	err := c.do(fmt.Sprintf("electricity-meter-points/%s/", mpan), &data)
 	if err != nil {
-		return MeterPoint{}, errors.Errorf("http get error: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return MeterPoint{}, errors.Errorf("http error - code %d received", resp.StatusCode)
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&data)
-	if err != nil {
-		return MeterPoint{}, errors.Errorf("unable to unmarshal json: %v", err)
+		return MeterPoint{}, errors.Errorf("error retrieving meterpoint: %v", err)
 	}
 
 	// Mask JSON struct into MeterPoint
@@ -164,19 +90,9 @@ func (c *Client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
 		} `json:"results"`
 	}{}
 
-	resp, err := c.httpClient.Get(fmt.Sprintf("%s/industry/grid-supply-points/?postcode=%s", c.URL, postcode))
+	err := c.do(fmt.Sprintf("industry/grid-supply-points/?postcode=%s", postcode), &data)
 	if err != nil {
-		return GridSupplyPoint{}, errors.Errorf("http get error: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return GridSupplyPoint{}, errors.Errorf("http error - code %d received", resp.StatusCode)
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&data)
-	if err != nil {
-		return GridSupplyPoint{}, errors.Errorf("unable to unmarshal json: %v", err)
+		return GridSupplyPoint{}, errors.Errorf("error retrieving grid supply point: %v", err)
 	}
 
 	// Only return data if we are dealing with a single result
@@ -189,32 +105,8 @@ func (c *Client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
 			return gsp, nil
 		}
 	}
+
 	return GridSupplyPoint{}, errors.New("unknown grid supply point")
-
-}
-
-// Consumption represents a power consumption in a given interval
-type Consumption struct {
-	// Value represents meter reading for the interval
-	// Unit depends on the type of meter:
-	//
-	// Electricity meters: kWh
-	//
-	// SMETS1 Secure gas meters: kWh
-	//
-	// SMETS2 gas meters: m^3
-	Value         float32   `json:"consumption"`
-	IntervalStart time.Time `json:"interval_start"`
-	IntervalEnd   time.Time `json:"interval_end"`
-}
-
-// ConsumptionOption represents optional parameters for API.GetMeterConsumption
-type ConsumptionOption struct {
-	From     time.Time
-	To       time.Time
-	PageSize int
-	OrderBy  string
-	GroupBy  string
 }
 
 // GetMeterConsumption retrieves meter consumption
@@ -227,7 +119,7 @@ func (c *Client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 		Results      []Consumption `json:"results"`
 	}{}
 
-	apiURL, err := url.Parse(fmt.Sprintf("%s/electricity-meter-points/%s/meters/%s/consumption/", c.URL, mpan, serialNo))
+	apiURL, err := url.Parse(fmt.Sprintf("electricity-meter-points/%s/meters/%s/consumption/", mpan, serialNo))
 	if err != nil {
 		return nil, errors.Errorf("unable to parse request url: %v", err)
 	}
@@ -253,23 +145,12 @@ func (c *Client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 		apiURL.RawQuery = q.Encode()
 	}
 
-	resp, err := c.httpClient.Get(apiURL.String())
+	err = c.do(apiURL.String(), &data)
 	if err != nil {
-		return nil, errors.Errorf("http get error: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("http error - code %d received", resp.StatusCode)
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&data)
-	if err != nil {
-		return nil, errors.Errorf("unable to unmarshal json: %v", err)
+		return nil, errors.Errorf("error retrieving meter consumption: %v", err)
 	}
 
 	return data.Results, nil
-
 }
 
 // checkPostcode checks if provided string is a valid UK postcode
@@ -277,76 +158,13 @@ func checkPostcode(postcode string) bool {
 	return postcodeRegex.MatchString(postcode)
 }
 
-// Product represents an Octopus Energy product
-// https://developer.octopus.energy/docs/api/#retrieve-a-product
-type Product struct {
-	Code                      string                       `json:"code"`
-	Direction                 string                       `json:"direciton"`
-	FullName                  string                       `json:"full_name"`
-	DisplayName               string                       `json:"display_name"`
-	Description               string                       `json:"description"`
-	IsVariable                bool                         `json:"is_variable"`
-	IsGreen                   bool                         `json:"is_green"`
-	IsTracker                 bool                         `json:"is_tracker"`
-	IsPrepay                  bool                         `json:"is_prepay"`
-	IsBusiness                bool                         `json:"is_business"`
-	IsRestricted              bool                         `json:"is_restricted"`
-	Term                      int                          `json:"term"`
-	AvailableFrom             time.Time                    `json:"available_from"`
-	AvailableTo               time.Time                    `json:"available_to"`
-	Links                     []Link                       `json:"links"`
-	SingleRegisterElecTariffs map[string]map[string]Tariff `json:"single_register_electricity_tariffs"`
-	DualRegisterElecTariffs   map[string]map[string]Tariff `json:"dual_register_electricity_tariffs"`
-	SingleRegisterGasTariffs  map[string]map[string]Tariff `json:"single_register_gas_tariffs"`
-}
-
-// Link represents a hyperlink
-type Link struct {
-	Href   string `json:"href"`
-	Method string `json:"method"`
-	Rel    string `json:"rel"`
-}
-
-// Tariff represent an Octopus Energy tariff
-type Tariff struct {
-	Code                   string  `json:"code"`
-	StandingChargeExcVAT   float32 `json:"standing_charge_exc_vat"`
-	StandingChargeIncVAT   float32 `json:"standing_charge_inc_vat"`
-	OnlineDiscountExcVAT   float32 `json:"online_discount_exc_vat"`
-	OnlineDiscountIncVAT   float32 `json:"online_discount_inc_vat"`
-	DualFuelDiscountExcVAT float32 `json:"dual_fuel_discount_exc_vat"`
-	DualFuelDiscountIncVAT float32 `json:"dual_fuel_discount_inc_vat"`
-	ExitFeesExcVAT         float32 `json:"exit_fees_exc_vat"`
-	ExitFeesIncVAT         float32 `json:"exit_fees_inc_vat"`
-	Links                  []Link  `json:"links"`
-	StandardUnitRateExcVAT float32 `json:"standard_unit_rate_exc_vat"`
-	StandardUnitRateIncVAT float32 `json:"standard_unit_rate_inc_vat"`
-}
-
-type productJSON struct {
-	Count    int       `json:"count"`
-	Next     string    `json:"next"`
-	Previous string    `json:"previous"`
-	Results  []Product `json:"results"`
-}
-
 // listProductsPage retrieves products from a single page of JSON data
 func (c *Client) listProductsPage(URL string) ([]Product, string, error) {
 	var data productJSON
 
-	resp, err := c.httpClient.Get(URL)
+	err := c.do(URL, &data)
 	if err != nil {
-		return nil, "", errors.Errorf("http get error: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", errors.Errorf("http error - code %d received", resp.StatusCode)
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&data)
-	if err != nil {
-		return nil, "", errors.Errorf("unable to unmarshal json: %v", err)
+		return nil, "", errors.Errorf("error retrieving: %v", err)
 	}
 
 	return data.Results, data.Next, nil
@@ -383,19 +201,9 @@ func (c *Client) ListProducts() ([]Product, error) {
 func (c *Client) GetProduct(productCode string) (Product, error) {
 	var product Product
 
-	resp, err := c.httpClient.Get(fmt.Sprintf("%s/products/%s/", c.URL, productCode))
+	err := c.do(fmt.Sprintf("products/%s/", productCode), &product)
 	if err != nil {
-		return Product{}, errors.Errorf("http get error: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return Product{}, errors.Errorf("http error - code %d received", resp.StatusCode)
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&product)
-	if err != nil {
-		return Product{}, errors.Errorf("unable to unmarshal json: %v", err)
+		return Product{}, errors.Errorf("error retrieving the product: %v", err)
 	}
 
 	return product, nil
@@ -410,4 +218,22 @@ func urlAddUsername(URL, username string) (string, error) {
 
 	u.User = url.UserPassword(username, "")
 	return u.String(), nil
+}
+
+func (c *Client) do(path string, v interface{}) error {
+	resp, err := c.httpClient.Get(fmt.Sprintf("%s/%s", c.URL, path))
+	if err != nil {
+		return errors.Errorf("http get error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.Errorf("http error - code %d received", resp.StatusCode)
+	}
+
+	if err = json.NewDecoder(resp.Body).Decode(&v); err != nil {
+		return errors.Errorf("unable to unmarshal json: %v", err)
+	}
+
+	return nil
 }

@@ -14,7 +14,7 @@ func main() {
 	// Meter's serial number
 	serialno := "1234567890"
 
-	client, err := octopusenergyapi.NewClient("API_KEY}", http.DefaultClient)
+	client, err := octopusenergyapi.NewClient("{API_KEY}", http.DefaultClient)
 	if err != nil {
 		log.Fatal(err)
 	}
