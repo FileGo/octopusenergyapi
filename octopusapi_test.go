@@ -71,7 +71,6 @@ func TestNewClient(t *testing.T) {
 			assert.Contains(t, err.Error(), "empty")
 		}
 	})
-
 }
 
 func testingHTTPClient(handler http.Handler, options ...bool) (*http.Client, func()) {
@@ -117,53 +116,15 @@ func TestListProducts(t *testing.T) {
 		}
 	})
 
-	t.Run("http_error", func(t *testing.T) {
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusForbidden)
-		})
-		httpClient, teardown := testingHTTPClient(h)
+	t.Run("fail", func(t *testing.T) {
+		httpClient, teardown := testingHTTPClient(nil)
 		defer teardown()
 
 		client, err := NewClient("fakeapikey", httpClient)
 		if assert.Nil(t, err) {
 			_, err = client.ListProducts()
 			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "http error")
-			}
-		}
-	})
-
-	t.Run("json_error", func(t *testing.T) {
-		f, err := os.Open("./testdata/error.json")
-		assert.Nil(t, err)
-		defer f.Close()
-
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
-		})
-		httpClient, teardown := testingHTTPClient(h)
-		defer teardown()
-
-		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.ListProducts()
-			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "unmarshal json")
-			}
-		}
-	})
-
-	t.Run("nilURL_error", func(t *testing.T) {
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		})
-		httpClient, teardown := testingHTTPClient(h, true)
-		defer teardown()
-
-		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.ListProducts()
-			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "http get error")
+				assert.Contains(t, err.Error(), "error retrieving")
 			}
 		}
 	})
@@ -200,54 +161,16 @@ func TestGetProduct(t *testing.T) {
 		}
 	})
 
-	t.Run("http_error", func(t *testing.T) {
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusForbidden)
-		})
-		httpClient, teardown := testingHTTPClient(h)
+	t.Run("fail", func(t *testing.T) {
+		httpClient, teardown := testingHTTPClient(nil)
 		defer teardown()
 
 		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.GetProduct("productcode")
-			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "http error")
-			}
-		}
-	})
-
-	t.Run("json_error", func(t *testing.T) {
-		f, err := os.Open("./testdata/error.json")
 		assert.Nil(t, err)
-		defer f.Close()
 
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
-		})
-		httpClient, teardown := testingHTTPClient(h)
-		defer teardown()
-
-		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.GetProduct("productcode")
-			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "unmarshal json")
-			}
-		}
-	})
-
-	t.Run("nilURL_error", func(t *testing.T) {
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		})
-		httpClient, teardown := testingHTTPClient(h, true)
-		defer teardown()
-
-		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.GetProduct("productcode")
-			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "http get error")
-			}
+		_, err = client.GetProduct("")
+		if assert.NotNil(t, err) {
+			assert.Contains(t, err.Error(), "error retrieving")
 		}
 	})
 }
@@ -284,8 +207,21 @@ func TestGetMeterPoint(t *testing.T) {
 		}
 	})
 
-	t.Run("no_gsp_error", func(t *testing.T) {
-		f, err := os.Open("./testdata/getmeterpoint_nogsp.json")
+	t.Run("fail", func(t *testing.T) {
+		httpClient, teardown := testingHTTPClient(nil)
+		defer teardown()
+
+		client, err := NewClient("fakeapikey", httpClient)
+		assert.Nil(t, err)
+
+		_, err = client.GetMeterPoint("")
+		if assert.NotNil(t, err) {
+			assert.Contains(t, err.Error(), "error retrieving meterpoint")
+		}
+	})
+
+	t.Run("fail_nogsp", func(t *testing.T) {
+		f, err := os.Open("testdata/getgridsupplypoint_nogsp.json")
 		assert.Nil(t, err)
 		defer f.Close()
 
@@ -296,63 +232,12 @@ func TestGetMeterPoint(t *testing.T) {
 		defer teardown()
 
 		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.GetMeterPoint("0123456789")
-
-			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "no grid supply point found")
-			}
-		}
-	})
-
-	t.Run("http_error", func(t *testing.T) {
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusForbidden)
-		})
-		httpClient, teardown := testingHTTPClient(h)
-		defer teardown()
-
-		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.GetMeterPoint("0123456789")
-			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "http error")
-			}
-		}
-	})
-
-	t.Run("json_error", func(t *testing.T) {
-		f, err := os.Open("./testdata/error.json")
 		assert.Nil(t, err)
-		defer f.Close()
 
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
-		})
-		httpClient, teardown := testingHTTPClient(h)
-		defer teardown()
+		_, err = client.GetMeterPoint("1234567890")
 
-		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.GetMeterPoint("0123456789")
-			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "unmarshal json")
-			}
-		}
-	})
-
-	t.Run("nilURL_error", func(t *testing.T) {
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		})
-		httpClient, teardown := testingHTTPClient(h, true)
-		defer teardown()
-
-		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.GetMeterPoint("0123456789")
-			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "http get error")
-			}
+		if assert.NotNil(t, err) {
+			assert.Contains(t, err.Error(), "point found")
 		}
 	})
 }
@@ -437,54 +322,16 @@ func TestGetGridSupplyPoint(t *testing.T) {
 		}
 	})
 
-	t.Run("http_error", func(t *testing.T) {
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusForbidden)
-		})
-		httpClient, teardown := testingHTTPClient(h)
+	t.Run("fail", func(t *testing.T) {
+		httpClient, teardown := testingHTTPClient(nil)
 		defer teardown()
 
 		client, err := NewClient("fakeapikey", httpClient)
 		if assert.Nil(t, err) {
 			_, err = client.GetGridSupplyPoint("SW1A 1AA")
 			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "http error")
+				assert.Contains(t, err.Error(), "error retrieving")
 			}
-		}
-	})
-
-	t.Run("json_error", func(t *testing.T) {
-		f, err := os.Open("./testdata/error.json")
-		assert.Nil(t, err)
-		defer f.Close()
-
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
-		})
-		httpClient, teardown := testingHTTPClient(h)
-		defer teardown()
-
-		client, err := NewClient("fakeapikey", httpClient)
-		assert.Nil(t, err)
-
-		_, err = client.GetGridSupplyPoint("SW1A 1AA")
-		if assert.NotNil(t, err) {
-			assert.Contains(t, err.Error(), "unmarshal json")
-		}
-	})
-
-	t.Run("nilURL_error", func(t *testing.T) {
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		})
-		httpClient, teardown := testingHTTPClient(h, true)
-		defer teardown()
-
-		client, err := NewClient("fakeapikey", httpClient)
-		assert.Nil(t, err)
-
-		_, err = client.GetGridSupplyPoint("SW1A 1AA")
-		if assert.NotNil(t, err) {
-			assert.Contains(t, err.Error(), "http get error")
 		}
 	})
 }
@@ -493,7 +340,7 @@ func TestGetMeterConsumption(t *testing.T) {
 	mpan := "0123456789"
 	serialNo := "0123456789"
 
-	t.Run("options", func(t *testing.T) {
+	t.Run("pass", func(t *testing.T) {
 		timeFrom, err := time.Parse("2006-01-02 15:04:05", "2020-01-02 12:23:34")
 		assert.Nil(t, err)
 		timeTo, err := time.Parse("2006-01-02 15:04:05", "2020-01-03 12:23:34")
@@ -533,22 +380,49 @@ func TestGetMeterConsumption(t *testing.T) {
 		}
 	})
 
-	t.Run("json_error", func(t *testing.T) {
-		f, err := os.Open("./testdata/error.json")
-		assert.Nil(t, err)
-		defer f.Close()
-
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
-		})
-		httpClient, teardown := testingHTTPClient(h)
+	t.Run("fail", func(t *testing.T) {
+		httpClient, teardown := testingHTTPClient(nil)
 		defer teardown()
 
 		client, err := NewClient("fakeapikey", httpClient)
 		if assert.Nil(t, err) {
 			_, err = client.GetMeterConsumption(mpan, serialNo, ConsumptionOption{})
 			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "unmarshal json")
+				assert.Contains(t, err.Error(), "error retrieving")
+			}
+		}
+	})
+}
+
+func TestDo(t *testing.T) {
+	t.Run("psass", func(t *testing.T) {
+		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("[]"))
+		})
+		httpClient, teardown := testingHTTPClient(h)
+		defer teardown()
+
+		client, err := NewClient("fakeapikey", httpClient)
+		if assert.Nil(t, err) {
+			var out interface{}
+			err = client.do("testpath", out)
+			if assert.Nil(t, err) {
+				assert.Equal(t, nil, out)
+			}
+		}
+	})
+
+	t.Run("httpget_error", func(t *testing.T) {
+		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		})
+		httpClient, teardown := testingHTTPClient(h, true)
+		defer teardown()
+
+		client, err := NewClient("fakeapikey", httpClient)
+		if assert.Nil(t, err) {
+			err = client.do("testpath", nil)
+			if assert.NotNil(t, err) {
+				assert.Contains(t, err.Error(), "http get error")
 			}
 		}
 	})
@@ -562,25 +436,29 @@ func TestGetMeterConsumption(t *testing.T) {
 
 		client, err := NewClient("fakeapikey", httpClient)
 		if assert.Nil(t, err) {
-			_, err = client.GetMeterConsumption(mpan, serialNo, ConsumptionOption{})
+			err = client.do("testpath", nil)
 			if assert.NotNil(t, err) {
 				assert.Contains(t, err.Error(), "http error")
 			}
 		}
 	})
 
-	t.Run("nilURL_error", func(t *testing.T) {
+	t.Run("json_error", func(t *testing.T) {
+		f, err := os.Open("./testdata/error.json")
+		assert.Nil(t, err)
+		defer f.Close()
+
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusInternalServerError)
+			io.Copy(w, f)
 		})
-		httpClient, teardown := testingHTTPClient(h, true)
+		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
 
 		client, err := NewClient("fakeapikey", httpClient)
 		if assert.Nil(t, err) {
-			_, err = client.GetMeterConsumption(mpan, serialNo, ConsumptionOption{})
+			err = client.do("testpath", nil)
 			if assert.NotNil(t, err) {
-				assert.Contains(t, err.Error(), "http get error")
+				assert.Contains(t, err.Error(), "unmarshal json")
 			}
 		}
 	})
