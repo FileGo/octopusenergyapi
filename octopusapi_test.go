@@ -355,29 +355,58 @@ func TestGetMeterConsumption(t *testing.T) {
 			PageSize: pageSize,
 		}
 
-		f, err := os.Open("./testdata/consumption.json")
-		assert.Nil(t, err)
-		defer f.Close()
-
-		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			q := r.URL.Query()
-
-			assert.Equal(t, options.From.Format(iso8601), q.Get("period_from"))
-			assert.Equal(t, options.To.Format(iso8601), q.Get("period_to"))
-			assert.Equal(t, fmt.Sprint(pageSize), q.Get("page_size"))
-			assert.Equal(t, options.OrderBy, q.Get("order_by"))
-			assert.Equal(t, options.GroupBy, q.Get("group_by"))
-
-			io.Copy(w, f)
-		})
-		httpClient, teardown := testingHTTPClient(h)
-		defer teardown()
-
-		client, err := NewClient("fakeapikey", httpClient)
-		if assert.Nil(t, err) {
-			_, err = client.GetMeterConsumption(mpan, serialNo, options)
+		t.Run("pass_electricity", func(t *testing.T) {
+			f, err := os.Open("./testdata/consumption_elec.json")
 			assert.Nil(t, err)
-		}
+			defer f.Close()
+
+			h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				q := r.URL.Query()
+
+				assert.Equal(t, options.From.Format(iso8601), q.Get("period_from"))
+				assert.Equal(t, options.To.Format(iso8601), q.Get("period_to"))
+				assert.Equal(t, fmt.Sprint(pageSize), q.Get("page_size"))
+				assert.Equal(t, options.OrderBy, q.Get("order_by"))
+				assert.Equal(t, options.GroupBy, q.Get("group_by"))
+
+				io.Copy(w, f)
+			})
+			httpClient, teardown := testingHTTPClient(h)
+			defer teardown()
+
+			client, err := NewClient("fakeapikey", httpClient)
+			if assert.Nil(t, err) {
+				_, err = client.GetElecMeterConsumption(mpan, serialNo, options)
+				assert.Nil(t, err)
+			}
+		})
+
+		t.Run("pass_gas", func(t *testing.T) {
+			f, err := os.Open("./testdata/consumption_gas.json")
+			assert.Nil(t, err)
+			defer f.Close()
+
+			h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				q := r.URL.Query()
+
+				assert.Equal(t, options.From.Format(iso8601), q.Get("period_from"))
+				assert.Equal(t, options.To.Format(iso8601), q.Get("period_to"))
+				assert.Equal(t, fmt.Sprint(pageSize), q.Get("page_size"))
+				assert.Equal(t, options.OrderBy, q.Get("order_by"))
+				assert.Equal(t, options.GroupBy, q.Get("group_by"))
+
+				io.Copy(w, f)
+			})
+			httpClient, teardown := testingHTTPClient(h)
+			defer teardown()
+
+			client, err := NewClient("fakeapikey", httpClient)
+			if assert.Nil(t, err) {
+				_, err = client.GetGasMeterConsumption(mpan, serialNo, options)
+				assert.Nil(t, err)
+			}
+		})
+
 	})
 
 	t.Run("fail", func(t *testing.T) {
@@ -386,7 +415,12 @@ func TestGetMeterConsumption(t *testing.T) {
 
 		client, err := NewClient("fakeapikey", httpClient)
 		if assert.Nil(t, err) {
-			_, err = client.GetMeterConsumption(mpan, serialNo, ConsumptionOption{})
+			_, err = client.GetElecMeterConsumption(mpan, serialNo, ConsumptionOption{})
+			if assert.NotNil(t, err) {
+				assert.Contains(t, err.Error(), "error retrieving")
+			}
+
+			_, err = client.GetGasMeterConsumption(mpan, serialNo, ConsumptionOption{})
 			if assert.NotNil(t, err) {
 				assert.Contains(t, err.Error(), "error retrieving")
 			}

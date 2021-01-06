@@ -7,8 +7,10 @@ import (
 )
 
 const (
-	iso8601 = "2006-01-02T15:04:05.000+0000"
-	baseURL = "https://api.octopus.energy/v1"
+	iso8601         = "2006-01-02T15:04:05.000+0000"
+	baseURL         = "https://api.octopus.energy/v1"
+	fuelElectricity = "electricity"
+	fuelGas         = "gas"
 )
 
 // GSPs provides a list of Grid Supply Points (GSP)
