@@ -19,7 +19,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	cons, err := client.GetMeterConsumption(mpan, serialno, octopusenergyapi.ConsumptionOption{})
+	cons, err := client.GetElecMeterConsumption(mpan, serialno, octopusenergyapi.ConsumptionOption{})
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -39,7 +39,7 @@ func NewClient(APIkey string, httpClient *http.Client) (*Client, error) {
 	}, nil
 }
 
-// GetMeterPoint retrieves a meter point for a given MPAN
+// GetMeterPoint retrieves an electricity meter point for a given MPAN
 // https://developer.octopus.energy/docs/api/#electricity-meter-points
 func (c *Client) GetMeterPoint(mpan string) (MeterPoint, error) {
 	data := struct {
@@ -111,7 +111,7 @@ func (c *Client) GetGridSupplyPoint(postcode string) (GridSupplyPoint, error) {
 
 // GetMeterConsumption retrieves meter consumption
 // https://developer.octopus.energy/docs/api/#consumption
-func (c *Client) GetMeterConsumption(mpan, serialNo string, options ConsumptionOption) ([]Consumption, error) {
+func (c *Client) getMeterConsumption(fuel, mpan, serialNo string, options ConsumptionOption) ([]Consumption, error) {
 	data := struct {
 		Count        int           `json:"count"`
 		NextPage     string        `json:"next"`
@@ -119,7 +119,7 @@ func (c *Client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 		Results      []Consumption `json:"results"`
 	}{}
 
-	apiURL, err := url.Parse(fmt.Sprintf("electricity-meter-points/%s/meters/%s/consumption/", mpan, serialNo))
+	apiURL, err := url.Parse(fmt.Sprintf("%s-meter-points/%s/meters/%s/consumption/", fuel, mpan, serialNo))
 	if err != nil {
 		return nil, errors.Errorf("unable to parse request url: %v", err)
 	}
@@ -151,6 +151,18 @@ func (c *Client) GetMeterConsumption(mpan, serialNo string, options ConsumptionO
 	}
 
 	return data.Results, nil
+}
+
+// GetElecMeterConsumption retrieves electricity consumption
+// https://developer.octopus.energy/docs/api/#consumption
+func (c *Client) GetElecMeterConsumption(mpan, serialNo string, options ConsumptionOption) ([]Consumption, error) {
+	return c.getMeterConsumption(fuelElectricity, mpan, serialNo, options)
+}
+
+// GetGasMeterConsumption retrieves electricity consumption
+// https://developer.octopus.energy/docs/api/#consumption
+func (c *Client) GetGasMeterConsumption(mpan, serialNo string, options ConsumptionOption) ([]Consumption, error) {
+	return c.getMeterConsumption(fuelGas, mpan, serialNo, options)
 }
 
 // checkPostcode checks if provided string is a valid UK postcode

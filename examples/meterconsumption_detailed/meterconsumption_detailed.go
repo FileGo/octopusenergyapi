@@ -27,7 +27,7 @@ func main() {
 		PageSize: 25000,
 	}
 
-	cons, err := client.GetMeterConsumption(mpan, serialno, options)
+	cons, err := client.GetElecMeterConsumption(mpan, serialno, options)
 	if err != nil {
 		log.Fatal(err)
 	}
