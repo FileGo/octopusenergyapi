@@ -12,7 +12,7 @@ An API key from Octopus Energy is required, as mentioned [here](https://develope
 
 ## Usage
 
-```
+```golang
 client, err := octopusenergyapi.NewClient("{API_KEY}", http.DefaultClient)
 if err != nil {
     log.Fatal(err)
