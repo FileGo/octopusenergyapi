@@ -2,7 +2,6 @@ package octopusenergyapi
 
 import (
 	"net/http"
-	"regexp"
 	"time"
 )
 
@@ -58,9 +57,8 @@ type GridSupplyPoint struct {
 
 // Client represents a Client to be used with the API
 type Client struct {
-	httpClient    *http.Client
-	URL           string
-	postcodeRegex *regexp.Regexp
+	httpClient *http.Client
+	URL        string
 }
 
 // MeterPoint represents a meter point

@@ -179,7 +179,7 @@ func (c *Client) listProductsPage(URL string) ([]Product, string, error) {
 		return nil, "", errors.Errorf("error retrieving: %v", err)
 	}
 
-	return data.Results, data.Next, nil
+	return data.Results, strings.TrimPrefix(data.Next, baseURL), nil
 }
 
 // ListProducts returns a list of energy products
@@ -187,7 +187,7 @@ func (c *Client) listProductsPage(URL string) ([]Product, string, error) {
 func (c *Client) ListProducts() ([]Product, error) {
 	var products []Product
 
-	URL := fmt.Sprintf("%s/products/", c.URL)
+	URL := "/products/"
 
 	for {
 		pageProducts, url, err := c.listProductsPage(URL)
@@ -196,10 +196,7 @@ func (c *Client) ListProducts() ([]Product, error) {
 			return nil, errors.Errorf("error retrieving products page: %v", err)
 		}
 
-		for _, product := range pageProducts {
-			products = append(products, product)
-		}
-
+		products = append(products, pageProducts...)
 		if URL == "" {
 			break
 		}
