@@ -102,7 +102,8 @@ func TestListProducts(t *testing.T) {
 		defer f.Close()
 
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
+			_, err = io.Copy(w, f)
+			assert.Nil(t, err)
 		})
 		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
@@ -137,7 +138,8 @@ func TestGetProduct(t *testing.T) {
 		defer f.Close()
 
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
+			_, err = io.Copy(w, f)
+			assert.Nil(t, err)
 		})
 		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
@@ -182,7 +184,8 @@ func TestGetMeterPoint(t *testing.T) {
 		defer f.Close()
 
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
+			_, err = io.Copy(w, f)
+			assert.Nil(t, err)
 		})
 		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
@@ -226,7 +229,8 @@ func TestGetMeterPoint(t *testing.T) {
 		defer f.Close()
 
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
+			_, err = io.Copy(w, f)
+			assert.Nil(t, err)
 		})
 		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
@@ -249,7 +253,8 @@ func TestGetGridSupplyPoint(t *testing.T) {
 		defer f.Close()
 
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
+			_, err = io.Copy(w, f)
+			assert.Nil(t, err)
 		})
 		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
@@ -270,7 +275,8 @@ func TestGetGridSupplyPoint(t *testing.T) {
 		defer f.Close()
 
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
+			_, err = io.Copy(w, f)
+			assert.Nil(t, err)
 		})
 		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
@@ -291,7 +297,8 @@ func TestGetGridSupplyPoint(t *testing.T) {
 		defer f.Close()
 
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
+			_, err = io.Copy(w, f)
+			assert.Nil(t, err)
 		})
 		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
@@ -369,7 +376,8 @@ func TestGetMeterConsumption(t *testing.T) {
 				assert.Equal(t, options.OrderBy, q.Get("order_by"))
 				assert.Equal(t, options.GroupBy, q.Get("group_by"))
 
-				io.Copy(w, f)
+				_, err = io.Copy(w, f)
+				assert.Nil(t, err)
 			})
 			httpClient, teardown := testingHTTPClient(h)
 			defer teardown()
@@ -395,7 +403,8 @@ func TestGetMeterConsumption(t *testing.T) {
 				assert.Equal(t, options.OrderBy, q.Get("order_by"))
 				assert.Equal(t, options.GroupBy, q.Get("group_by"))
 
-				io.Copy(w, f)
+				_, err = io.Copy(w, f)
+				assert.Nil(t, err)
 			})
 			httpClient, teardown := testingHTTPClient(h)
 			defer teardown()
@@ -429,9 +438,10 @@ func TestGetMeterConsumption(t *testing.T) {
 }
 
 func TestDo(t *testing.T) {
-	t.Run("psass", func(t *testing.T) {
+	t.Run("pass", func(t *testing.T) {
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("[]"))
+			_, err := w.Write([]byte("[]"))
+			assert.Nil(t, err)
 		})
 		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
@@ -483,7 +493,8 @@ func TestDo(t *testing.T) {
 		defer f.Close()
 
 		h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.Copy(w, f)
+			_, err = io.Copy(w, f)
+			assert.Nil(t, err)
 		})
 		httpClient, teardown := testingHTTPClient(h)
 		defer teardown()
